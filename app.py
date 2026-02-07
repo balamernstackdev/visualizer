@@ -20,6 +20,22 @@ from paint_ai.paint_engine import apply_realistic_paint
 from utils.render_utils import render_high_res
 from streamlit_javascript import st_javascript
 
+# --- Universal Version Bridge (Monkey Patch for Canvas & Fragments) ---
+import streamlit.elements.image as st_image
+if not hasattr(st_image, 'image_to_url'):
+    def patched_image_to_url(data, width, height, clamp, channels, format, image_id):
+        from streamlit.runtime import runtime
+        return runtime.get_instance().media_file_mgr.add(data, "image/png", image_id)
+    st_image.image_to_url = patched_image_to_url
+
+# Hybrid Fragment Decorator (Survives any version)
+def smart_fragment(f):
+    if hasattr(st, "fragment"):
+        return st.fragment(f)
+    elif hasattr(st, "experimental_fragment"):
+        return st.experimental_fragment(f)
+    return f
+
 # Page Config
 st.set_page_config(
     page_title="AI Paint Visualizer Pro",
@@ -200,7 +216,7 @@ is_mobile = (js_width > 0 and js_width < 1100)
 # UPLOAD HANDLING: Always Sidebar
 uploaded_file = st.sidebar.file_uploader("Upload Room Image", type=["jpg", "png", "jpeg"])
 
-@st.fragment
+@smart_fragment
 def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", lasso_op="Add"):
     # --- ROBUST DEVICE DETECTION ---
     js_width = st.session_state.get('screen_width', 0)
@@ -681,7 +697,7 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
 
 
 
-@st.fragment
+@smart_fragment
 def sidebar_controller_fragment():
     # --- Unified Sidebar Manager ---
     st.markdown("### 🛠 Selection Tool")
