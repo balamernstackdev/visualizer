@@ -1,3 +1,4 @@
+# AI Paint Visualizer Pro - Version 1.0.1
 import streamlit as st
 import numpy as np
 import cv2
