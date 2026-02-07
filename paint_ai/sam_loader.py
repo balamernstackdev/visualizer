@@ -53,12 +53,15 @@ def load_sam_model():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     try:
-        sam = sam_model_registry[MODEL_TYPE](checkpoint=SAM_CHECKPOINT_PATH)
-        # On CPU, we stay in float32 for compatibility, but we can limit threads
-        if device == "cpu":
-            torch.set_num_threads(1) 
-        sam.to(device=device)
-        return sam
+        import torch
+        with torch.inference_mode():
+            sam = sam_model_registry[MODEL_TYPE](checkpoint=SAM_CHECKPOINT_PATH)
+            # On CPU, we stay in float32 for compatibility, but we can limit threads
+            if device == "cpu":
+                torch.set_num_threads(1) 
+            sam.to(device=device)
+            sam.eval() # Ensure eval mode
+            return sam
     except Exception as e:
         st.error(f"Error loading model: {e}")
         return None

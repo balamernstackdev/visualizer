@@ -352,11 +352,12 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
             if download_model_if_needed():
                 with st.spinner("🧠 Connecting AI (one-time setup)..."):
                     import gc
-                    gc.collect() # Flush everything before the big load
+                    gc.collect() 
                     st.session_state.predictor = get_sam_predictor()
                     if st.session_state.predictor:
-                        st.session_state.predictor.set_image(np.array(st.session_state.base_image))
+                        # DEFERRED: set_image will happen on first click to save RAM
                         st.session_state.state['ai_ready'] = True
+                        st.session_state.state['ai_image_embedded'] = False
                         gc.collect()
 
         # 2. LIGHTING SECOND (Wait for AI to settle)
@@ -525,7 +526,18 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
                              candidates.append({'mask': mask, 'id': f"arch_{i}"})
                     
                     if 'predictor' in st.session_state:
-                        p_masks, _, _ = st.session_state.predictor.predict(point_coords=np.array([[x, y]]), point_labels=np.array([1]), multimask_output=True)
+                        # EAGER EMBEDDING ON FIRST CLICK
+                        if not st.session_state.state.get('ai_image_embedded'):
+                            with st.spinner("🧠 Embedding image for AI..."):
+                                import gc
+                                gc.collect()
+                                st.session_state.predictor.set_image(np.array(st.session_state.base_image))
+                                st.session_state.state['ai_image_embedded'] = True
+                                gc.collect()
+                                
+                        import torch
+                        with torch.inference_mode():
+                            p_masks, _, _ = st.session_state.predictor.predict(point_coords=np.array([[x, y]]), point_labels=np.array([1]), multimask_output=True)
                         
                         # SEGMENTATION MODE LOGIC: Influence candidate selection
                         # SAM p_masks indices: 0 (Smallest/Detail), 1 (Medium/Object), 2 (Whole/Largest)
@@ -571,8 +583,19 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
             box = render_box_tool(img_disp, key=box_key, canvas_width=display_width)
             if box is not None:
                 if 'predictor' in st.session_state:
-                    # SAM Box prediction
-                    p_masks, _, _ = st.session_state.predictor.predict(box=np.array(box), multimask_output=True)
+                    # EAGER EMBEDDING ON FIRST CLICK
+                    if not st.session_state.state.get('ai_image_embedded'):
+                        with st.spinner("🧠 Embedding image for AI..."):
+                            import gc
+                            gc.collect()
+                            st.session_state.predictor.set_image(np.array(st.session_state.base_image))
+                            st.session_state.state['ai_image_embedded'] = True
+                            gc.collect()
+                            
+                    import torch
+                    with torch.inference_mode():
+                        # SAM Box prediction
+                        p_masks, _, _ = st.session_state.predictor.predict(box=np.array(box), multimask_output=True)
                     
                     # Same segmentation preference as click
                     if seg_mode == "Small Objects": indices = [0, 1, 2]
