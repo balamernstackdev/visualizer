@@ -344,6 +344,22 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
     
     # --- LAZY AI AND LIGHTING INITIALIZATION ---
     if 'base_image' in st.session_state:
+        # ---------------------------------------------
+        # --- LAZY AI AND LIGHTING INITIALIZATION ---
+        # 1. AI FIRST (Highest RAM risk)
+        if "AI" in tool_mode and not st.session_state.state.get('ai_ready'):
+            from paint_ai.sam_loader import get_sam_predictor, download_model_if_needed
+            if download_model_if_needed():
+                with st.spinner("🧠 Connecting AI (one-time setup)..."):
+                    import gc
+                    gc.collect() # Flush everything before the big load
+                    st.session_state.predictor = get_sam_predictor()
+                    if st.session_state.predictor:
+                        st.session_state.predictor.set_image(np.array(st.session_state.base_image))
+                        st.session_state.state['ai_ready'] = True
+                        gc.collect()
+
+        # 2. LIGHTING SECOND (Wait for AI to settle)
         if st.session_state.state.get('lighting_maps') is None:
             try:
                 with st.spinner("🌤 Analyzing lighting..."):
@@ -352,16 +368,6 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
             except Exception as e:
                 st.error(f"Memory limit hit during analysis. Please use a smaller image.")
                 return
-        
-        # Only initialize SAM if it's the first time and we are in an AI tool mode
-        if "AI" in tool_mode and not st.session_state.state.get('ai_ready'):
-            from paint_ai.sam_loader import get_sam_predictor, download_model_if_needed
-            if download_model_if_needed():
-                with st.spinner("🧠 Connecting AI (one-time setup)..."):
-                    st.session_state.predictor = get_sam_predictor()
-                    if st.session_state.predictor:
-                        st.session_state.predictor.set_image(np.array(st.session_state.base_image))
-                        st.session_state.state['ai_ready'] = True
     # ---------------------------------------------
 
     if 'base_image' in st.session_state:
@@ -723,11 +729,11 @@ try:
             
             # Store as BYTES to save massive RAM
             img_byte_arr = io.BytesIO()
-            image_raw.save(img_byte_arr, format='JPEG', quality=85) # Slightly lower quality for stability
+            image_raw.save(img_byte_arr, format='JPEG', quality=75) # Aggressive compression for stability
             st.session_state.full_res_bytes = img_byte_arr.getvalue()
             
             # Resize aggressively for cloud RAM limits
-            limit = 640 if is_mobile else 850
+            limit = 480 if is_mobile else 700
             st.session_state.base_image = resize_image_max_side(image_raw, limit)
             
             # Clear large raw image immediately
