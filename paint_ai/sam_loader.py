@@ -46,13 +46,18 @@ def download_model_if_needed():
 @st.cache_resource
 def load_sam_model():
     """Loads the SAM model and returns it. Cached by Streamlit."""
-    if not download_model_if_needed():
+    if not os.path.exists(SAM_CHECKPOINT_PATH):
+        # We don't want to auto-download inside a cached function if it's large
         return None
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     try:
         sam = sam_model_registry[MODEL_TYPE](checkpoint=SAM_CHECKPOINT_PATH)
+        # On CPU, we stay in float32 for compatibility, but we can limit threads
+        if device == "cpu":
+            import torch
+            torch.set_num_threads(1) 
         sam.to(device=device)
         return sam
     except Exception as e:

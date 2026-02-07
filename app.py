@@ -698,19 +698,27 @@ if uploaded_file:
         image = Image.open(uploaded_file).convert("RGB")
         # Store full resolution for 4K export
         st.session_state.full_res_image = image
-        # Resize to max 1600px for responsive UI and processing performance
-        st.session_state.base_image = resize_image_max_side(image, 1600)
+        # Load and resize image efficiently
+        image = Image.open(uploaded_file).convert("RGB")
+        # Store full resolution for 4K export
+        st.session_state.full_res_image = image
+        # Resize aggressively for cloud RAM limits
+        limit = 800 if is_mobile else 1200
+        st.session_state.base_image = resize_image_max_side(image, limit)
         
         # Pre-calculate lighting once
         with st.spinner("Analyzing image lighting..."):
             st.session_state.state['lighting_maps'] = extract_lighting_maps(st.session_state.base_image)
         
         # Initialize SAM
-        from paint_ai.sam_loader import get_sam_predictor
-        with st.spinner("Loading AI Model..."):
-            st.session_state.predictor = get_sam_predictor()
-            if st.session_state.predictor:
-                 st.session_state.predictor.set_image(np.array(st.session_state.base_image))
+        from paint_ai.sam_loader import get_sam_predictor, download_model_if_needed
+        if download_model_if_needed():
+            with st.spinner("Loading AI Model (this takes ~10s)..."):
+                st.session_state.predictor = get_sam_predictor()
+                if st.session_state.predictor:
+                     st.session_state.predictor.set_image(np.array(st.session_state.base_image))
+        else:
+            st.error("Model download failed or was cancelled. AI features will be disabled.")
     
     # 2. RENDER DASHBOARD
     # Pass necessary state
