@@ -139,12 +139,13 @@ if 'state' not in st.session_state:
         'mode': 'select', # 'select', 'lasso_add', 'lasso_sub'
         'lighting_maps': None,
         'image_id': None,
-        'debug_logs': [], # New: Log list
+        'debug_logs': [],
         'cached_paint_cv2': None,
         'cached_assignments_hash': None,
         'compare_mode': False,
         'segmentation_mode': 'Walls (Default)',
-        'selected_object_index': -1 # For tracking active edit
+        'selected_object_index': -1,
+        'ai_ready': False # Lazy AI flag
     }
 
 def add_log(msg):
@@ -334,20 +335,25 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
     selected_finish = "Matte"
     selected_reflectance = 0.5
     
-    # --- UPDATE ACTIVE OBJECT LOGIC ---
-    # If an object is actively selected, and the user changes the TOP COLOR PICKER, update that object.
-    active_idx = st.session_state.state.get('selected_object_index', -1)
-    if active_idx != -1 and active_idx in st.session_state.state['wall_assignments']:
-         current_data = st.session_state.state['wall_assignments'][active_idx]
-         # If picker color differs from object color, it means USER CHANGED THE PICKER.
-         if chosen_hex != current_data['hex']:
-             st.session_state.state['wall_assignments'][active_idx].update({
-                 'hex': chosen_hex,
-                 'lab': ui_lab,
-                 'id': chosen_hex
-             })
-             st.rerun()
-    # ----------------------------------
+    # --- LAZY AI AND LIGHTING INITIALIZATION ---
+    # Only run these if we have an image but haven't analyzed it yet
+    if 'base_image' in st.session_state:
+        if st.session_state.state.get('lighting_maps') is None:
+            with st.spinner("🌤 Analyzing lighting..."):
+                from utils.lighting_utils import extract_lighting_maps
+                st.session_state.state['lighting_maps'] = extract_lighting_maps(st.session_state.base_image)
+        
+        # Only initialize SAM if it's the first time and we are in an AI tool mode
+        if "AI" in tool_mode and not st.session_state.state.get('ai_ready'):
+            from paint_ai.sam_loader import get_sam_predictor, download_model_if_needed
+            if download_model_if_needed():
+                with st.spinner("🧠 Connecting AI (one-time setup)..."):
+                    st.session_state.predictor = get_sam_predictor()
+                    if st.session_state.predictor:
+                        st.session_state.predictor.set_image(np.array(st.session_state.base_image))
+                        st.session_state.state['ai_ready'] = True
+    # ---------------------------------------------
+
     if 'base_image' in st.session_state:
         preview_holder = st.empty()
         w, h = st.session_state.base_image.size
@@ -617,8 +623,11 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
                 with c1:
                     if st.button("Generate High Quality (4K) Download", key="dl_btn_desktop"):
                         with st.spinner("Preparing 4K resolution image (this takes a few seconds)..."):
+                            # Decompress full res image for rendering
+                            import io
+                            full_img = Image.open(io.BytesIO(st.session_state.full_res_bytes))
                             high_res_cv2 = render_high_res(
-                                st.session_state.full_res_image, 
+                                full_img, 
                                 st.session_state.state['masks'], 
                                 st.session_state.state['wall_assignments']
                             )
@@ -676,9 +685,10 @@ if uploaded_file:
     # Kept here just in case, but global is better
     # Removing duplicate call to avoid double reruns
         
-    # 1. FAST IMAGE LOAD (Instant Feedback)
+    # 1. FAST IMAGE LOAD (Ghost Mode)
     current_file_id = f"{uploaded_file.name}_{uploaded_file.size}"
     if st.session_state.state.get('image_id') != current_file_id:
+        import gc, io
         # Reset state on new file
         st.session_state.state = {
             'masks': [],
@@ -690,42 +700,26 @@ if uploaded_file:
             'cached_assignments_hash': "",
             'debug_logs': [],
             'compare_mode': False,
-            'selected_object_index': -1
+            'selected_object_index': -1,
+            'ai_ready': False
         }
-        st.session_state.canvas_key_id += 1 # Force new canvas
+        st.session_state.canvas_key_id += 1
         
-        # Load and resize image efficiently
-        image = Image.open(uploaded_file).convert("RGB")
-        # Store full resolution for 4K export
-        st.session_state.full_res_image = image
-        # Load and resize image efficiently
-        import gc
-        with st.status("🚀 Processing Image...", expanded=False) as status:
-            image = Image.open(uploaded_file).convert("RGB")
-            st.session_state.full_res_image = image
-            
-            # Shrink for cloud RAM limits (700px is very safe for 1GB RAM)
-            limit = 700 if is_mobile else 1000
-            st.session_state.base_image = resize_image_max_side(image, limit)
-            
-            # CRITICAL: Pre-calculate lighting BEFORE loading SAM to spread memory load
-            status.update(label="🌤 Analyzing lighting maps...")
-            st.session_state.state['lighting_maps'] = extract_lighting_maps(st.session_state.base_image)
-            
-            # Clear temporary large objects
-            gc.collect()
-
-        # Initialize SAM Lazily
-        from paint_ai.sam_loader import get_sam_predictor, download_model_if_needed
-        if download_model_if_needed():
-            with st.spinner("🧠 Loading AI Model (this takes ~10s)..."):
-                import torch
-                torch.set_grad_enabled(False)
-                st.session_state.predictor = get_sam_predictor()
-                if st.session_state.predictor:
-                     st.session_state.predictor.set_image(np.array(st.session_state.base_image))
-        else:
-            st.error("Model download failed. Please refresh.")
+        # Use Ghost Load: Open, Resize, then CLOSE and clear
+        image_raw = Image.open(uploaded_file).convert("RGB")
+        
+        # Store as BYTES to save massive RAM
+        img_byte_arr = io.BytesIO()
+        image_raw.save(img_byte_arr, format='JPEG', quality=90)
+        st.session_state.full_res_bytes = img_byte_arr.getvalue()
+        
+        # Resize aggressively for cloud RAM limits
+        limit = 640 if is_mobile else 900
+        st.session_state.base_image = resize_image_max_side(image_raw, limit)
+        
+        # Clear large raw image immediately
+        del image_raw
+        gc.collect()
     
     # 2. RENDER DASHBOARD
     # Pass necessary state
