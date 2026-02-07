@@ -56,7 +56,6 @@ def load_sam_model():
         sam = sam_model_registry[MODEL_TYPE](checkpoint=SAM_CHECKPOINT_PATH)
         # On CPU, we stay in float32 for compatibility, but we can limit threads
         if device == "cpu":
-            import torch
             torch.set_num_threads(1) 
         sam.to(device=device)
         return sam
