@@ -22,11 +22,12 @@ from streamlit_javascript import st_javascript
 
 # --- Universal Version Bridge (Monkey Patch for Canvas & Fragments) ---
 import streamlit.elements.image as st_image
-if not hasattr(st_image, 'image_to_url'):
-    def patched_image_to_url(data, width, height, clamp, channels, format, image_id):
-        from streamlit.runtime import runtime
-        return runtime.get_instance().media_file_mgr.add(data, "image/png", image_id)
-    st_image.image_to_url = patched_image_to_url
+# FORCE overwrite to ensure consistency across versions
+def patched_image_to_url(data, width, height, clamp, channels, format, image_id):
+    from streamlit.runtime import runtime
+    # Use the modern media manager API
+    return runtime.get_instance().media_file_mgr.add(data, "image/png", image_id)
+st_image.image_to_url = patched_image_to_url
 
 # Hybrid Fragment Decorator (Survives any version)
 def smart_fragment(f):
@@ -63,7 +64,7 @@ st.markdown("""
     }
     
     .block-container { 
-        padding-top: 2.5rem !important; /* Space for menu icon */
+        padding-top: 0.5rem !important; 
         padding-bottom: 0rem !important; 
         padding-left: 1rem !important;
         padding-right: 1rem !important;
@@ -398,6 +399,7 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
             /* Force container responsiveness */
             .main .block-container {{
                 max-width: 100% !important;
+                padding-top: 0.5rem !important; /* Changed from 2.5rem to 0.5rem */
                 padding-left: 1rem !important;
                 padding-right: 1rem !important;
             }}
@@ -405,6 +407,7 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
             /* FORCE CANVAS RESPONSIVENESS */
             canvas, .upper-canvas, .lower-canvas {{
                 max-width: 100% !important;
+                height: auto !important; /* Added back height: auto !important */
             }}
             /* Specific fix for st-canvas wrapper divs */
             div[style*="width:"] canvas, div[style*="width:"] .upper-canvas {{
