@@ -1,8 +1,17 @@
 import streamlit as st
 import numpy as np
 import json
+import os
 from PIL import Image
-from utils.image_utils import resize_image_max_side, pil_to_cv2, cv2_to_pil
+
+# GLOBAL RAM TUNING (First thing after imports)
+try:
+    import torch
+    torch.set_grad_enabled(False)
+    torch.set_num_threads(1)
+except:
+    pass
+
 from utils.export_utils import convert_to_downloadable, create_comparison_image
 from utils.lighting_utils import extract_lighting_maps
 from utils.mask_utils import merge_masks, smooth_mask, dilate_mask
@@ -10,9 +19,6 @@ from ui.lasso_canvas import render_lasso_tool, render_click_tool, render_box_too
 from paint_ai.paint_engine import apply_realistic_paint
 from utils.render_utils import render_high_res
 from streamlit_javascript import st_javascript
-
-# Lazy imports for heavy libraries
-# numpy and cv2 will be imported inside functions as needed
 
 # Page Config
 st.set_page_config(
@@ -22,7 +28,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS for Asian Paints Look ---
+# --- Room Visualization Logic ---
 st.markdown("""
 <style>
     /* 1. Global Layout Fixes */
@@ -114,7 +120,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Helper: Convert Hex to LAB for Paint Engine
+from utils.image_utils import resize_image_max_side, pil_to_cv2, cv2_to_pil
 def hex_to_lab(hex_code):
     import numpy as np
     import cv2
@@ -740,12 +746,16 @@ try:
             <p style='color: gray; font-size: 0.8rem;'>Detected Mode: {'Mobile' if is_mobile else 'Desktop'}</p>
         </div>
         """, unsafe_allow_html=True)
-
 except Exception as global_err:
     st.error(f"🚨 Critical App Crash: {global_err}")
     st.info("This is often due to server memory limits. Try using a smaller file or refreshing.")
     import traceback
     st.code(traceback.format_exc())
+    if st.button("Emergency App Reset"):
+        st.cache_resource.clear()
+        st.session_state.clear()
+        st.rerun()
+
 
 # --- Painted Objects Manager (Sidebar) ---
 st.sidebar.markdown("---")
