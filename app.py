@@ -182,9 +182,6 @@ def undo():
     if st.session_state.state['history']:
         st.session_state.state['wall_assignments'] = st.session_state.state['history'].pop()
 
-    save_history()
-    st.session_state.state['wall_assignments'] = {}
-
 def reset_paint():
     save_history()
     st.session_state.state['wall_assignments'] = {}
@@ -197,16 +194,17 @@ else:
     js_width = st.session_state.get('screen_width', 0)
 
 # Always define is_mobile globally for all blocks
-is_mobile = (js_width == 0 or (js_width > 0 and js_width < 1100))
+# Default to false (desktop) if width is unknown to prevent tiny mobile UI on big screens
+is_mobile = (js_width > 0 and js_width < 1100)
     
 # UPLOAD HANDLING: Always Sidebar
-uploaded_file = st.sidebar.file_uploader("Upload Room Image", type=["jpg", "png"])
+uploaded_file = st.sidebar.file_uploader("Upload Room Image", type=["jpg", "png", "jpeg"])
 
 @st.fragment
 def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", lasso_op="Add"):
     # --- ROBUST DEVICE DETECTION ---
     js_width = st.session_state.get('screen_width', 0)
-    is_mobile = (js_width == 0 or (js_width > 0 and js_width < 1100))
+    is_mobile = (js_width > 0 and js_width < 1100)
     
     # --- UNIFIED CONTROL HEADER ---
     h_col1, h_col2, h_spacer = st.columns([5, 1, 2], vertical_alignment="center")
@@ -295,11 +293,13 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
 
         # Width Logic
         if js_width and js_width > 0:
-            padding = 0 if is_mobile else 40
+            padding = 10 if is_mobile else 60
             target_width = js_width - padding
         else:
-            target_width = 360 if is_mobile else 1600
+            # Better defaults while loading JS
+            target_width = 800 
         display_width = int(min(img_w, target_width))
+        if display_width < 320: display_width = 320
 
         # Color and Header Row
         if is_mobile:
@@ -387,9 +387,7 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
             }}
             /* Canvas and iframe base styles */
             /* FORCE CANVAS RESPONSIVENESS */
-            canvas, .upper-canvas, .lower-canvas, [data-testid="stHorizontalBlock"] > div {{
-                width: 100% !important;
-                height: auto !important;
+            canvas, .upper-canvas, .lower-canvas {{
                 max-width: 100% !important;
             }}
             /* Specific fix for st-canvas wrapper divs */
