@@ -8,4 +8,5 @@ Pillow
 scipy
 streamlit-javascript
 streamlit-drawable-canvas
+requests
 # streamlit-image-coordinates  # Not currently used in app.py

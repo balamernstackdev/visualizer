@@ -201,6 +201,7 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
     # --- UNIFIED CONTROL HEADER ---
     h_col1, h_col2, h_spacer = st.columns([5, 1, 2], vertical_alignment="center")
     js_width = st.session_state.get('screen_width', 0)
+    is_mobile = (js_width == 0 or (js_width > 0 and js_width < 1100))
     
     # Initialize unified color state if not exists
     if 'unified_color' not in st.session_state:
@@ -208,7 +209,6 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
     
     if 'base_image' in st.session_state:
         img_w, _ = st.session_state.base_image.size
-        is_mobile = (js_width == 0 or (js_width > 0 and js_width < 1100))
         # --- ROBUST GLOBAL MOBILE & TABLET TOUCH SUPPORT (Ver 16: Shielded Bridge) ---
         st.components.v1.html("""
             <script>
