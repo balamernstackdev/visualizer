@@ -184,15 +184,15 @@ def reset_paint():
     save_history()
     st.session_state.state['wall_assignments'] = {}
 
-# UPLOAD HANDLING: Usually in Sidebar, but we need JS screen width first
-# ENSURE JS RUNS (Global Scope)
-# This MUST be outside any conditional block to work immediately on first load
-js_exists = st_javascript("window.innerWidth", key="screen_width_check_global")
-if js_exists:
-    st.session_state.screen_width = js_exists
-    # Force rerun if width changed significantly to update canvas interactively?
-    # Only if it was 0 before (first load)
-    # Actually st_javascript triggers rerun automatically on return.
+# SCREEN WIDTH DETECTION (Global Scope)
+js_width = st_javascript("window.innerWidth", key="screen_width_global")
+if js_width:
+    st.session_state.screen_width = js_width
+else:
+    js_width = st.session_state.get('screen_width', 0)
+
+# Always define is_mobile globally for all blocks
+is_mobile = (js_width == 0 or (js_width > 0 and js_width < 1100))
     
 # UPLOAD HANDLING: Always Sidebar
 uploaded_file = st.sidebar.file_uploader("Upload Room Image", type=["jpg", "png"])
@@ -201,8 +201,6 @@ uploaded_file = st.sidebar.file_uploader("Upload Room Image", type=["jpg", "png"
 def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", lasso_op="Add"):
     # --- UNIFIED CONTROL HEADER ---
     h_col1, h_col2, h_spacer = st.columns([5, 1, 2], vertical_alignment="center")
-    js_width = st.session_state.get('screen_width', 0)
-    is_mobile = (js_width == 0 or (js_width > 0 and js_width < 1100))
     
     # Initialize unified color state if not exists
     if 'unified_color' not in st.session_state:
@@ -602,19 +600,25 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
                 # Vertical Stack for Mobile
                 if st.button("Download High Quality (4K) Image", key="dl_btn_mobile", use_container_width=True):
                     with st.spinner("Generating 4K Render..."):
-                        high_res_cv2 = render_high_res(
-                            st.session_state.full_res_image, 
-                            st.session_state.state['masks'], 
-                            st.session_state.state['wall_assignments']
-                        )
-                        download_bytes = convert_to_downloadable(cv2_to_pil(high_res_cv2))
-                        st.download_button(
-                            "Confirm 4K Download", 
-                            download_bytes, 
-                            "painted_room_4k.png", 
-                            "image/png", 
-                            use_container_width=True
-                        )
+                        # Decompress full res image
+                        import io
+                        if 'full_res_bytes' in st.session_state:
+                            full_img = Image.open(io.BytesIO(st.session_state.full_res_bytes))
+                            high_res_cv2 = render_high_res(
+                                full_img, 
+                                st.session_state.state['masks'], 
+                                st.session_state.state['wall_assignments']
+                            )
+                            download_bytes = convert_to_downloadable(cv2_to_pil(high_res_cv2))
+                            st.download_button(
+                                "Confirm 4K Download", 
+                                download_bytes, 
+                                "painted_room_4k.png", 
+                                "image/png", 
+                                use_container_width=True
+                            )
+                        else:
+                            st.error("Original image data lost. Please re-upload.")
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.image(create_comparison_image(st.session_state.base_image, cv2_to_pil(canvas_cv2)), caption="Comparison", width=display_width)
             else:
