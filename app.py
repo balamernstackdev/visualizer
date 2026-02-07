@@ -691,60 +691,62 @@ with st.sidebar:
         if st.button("Reset", key="reset_btn"):
             reset_paint(); st.rerun()
 
-if uploaded_file:
-    # 0. ENSURE JS RUNS (Main Body) - MOVED TO TOP
-    # Kept here just in case, but global is better
-    # Removing duplicate call to avoid double reruns
+try:
+    if uploaded_file:
+        # 1. FAST IMAGE LOAD (Ghost Mode)
+        current_file_id = f"{uploaded_file.name}_{uploaded_file.size}"
+        if st.session_state.state.get('image_id') != current_file_id:
+            import gc, io
+            # Reset state on new file
+            st.session_state.state = {
+                'masks': [],
+                'wall_assignments': {},
+                'history': [],
+                'image_id': current_file_id,
+                'lighting_maps': None,
+                'cached_paint_cv2': None,
+                'cached_assignments_hash': "",
+                'debug_logs': [],
+                'compare_mode': False,
+                'selected_object_index': -1,
+                'ai_ready': False
+            }
+            st.session_state.canvas_key_id += 1
+            
+            # Use Ghost Load: Open, Resize, then CLOSE and clear
+            image_raw = Image.open(uploaded_file).convert("RGB")
+            
+            # Store as BYTES to save massive RAM
+            img_byte_arr = io.BytesIO()
+            image_raw.save(img_byte_arr, format='JPEG', quality=85) # Slightly lower quality for stability
+            st.session_state.full_res_bytes = img_byte_arr.getvalue()
+            
+            # Resize aggressively for cloud RAM limits
+            limit = 640 if is_mobile else 850
+            st.session_state.base_image = resize_image_max_side(image_raw, limit)
+            
+            # Clear large raw image immediately
+            del image_raw
+            gc.collect()
         
-    # 1. FAST IMAGE LOAD (Ghost Mode)
-    current_file_id = f"{uploaded_file.name}_{uploaded_file.size}"
-    if st.session_state.state.get('image_id') != current_file_id:
-        import gc, io
-        # Reset state on new file
-        st.session_state.state = {
-            'masks': [],
-            'wall_assignments': {},
-            'history': [],
-            'image_id': current_file_id,
-            'lighting_maps': None,
-            'cached_paint_cv2': None,
-            'cached_assignments_hash': "",
-            'debug_logs': [],
-            'compare_mode': False,
-            'selected_object_index': -1,
-            'ai_ready': False
-        }
-        st.session_state.canvas_key_id += 1
-        
-        # Use Ghost Load: Open, Resize, then CLOSE and clear
-        image_raw = Image.open(uploaded_file).convert("RGB")
-        
-        # Store as BYTES to save massive RAM
-        img_byte_arr = io.BytesIO()
-        image_raw.save(img_byte_arr, format='JPEG', quality=90)
-        st.session_state.full_res_bytes = img_byte_arr.getvalue()
-        
-        # Resize aggressively for cloud RAM limits
-        limit = 640 if is_mobile else 900
-        st.session_state.base_image = resize_image_max_side(image_raw, limit)
-        
-        # Clear large raw image immediately
-        del image_raw
-        gc.collect()
-    
-    # 2. RENDER DASHBOARD
-    # Pass necessary state
-    render_dashboard(tool_mode, compare_mode=st.session_state.state['compare_mode'], seg_mode=seg_mode, lasso_op=lasso_op)
+        # 2. RENDER DASHBOARD
+        render_dashboard(tool_mode, compare_mode=st.session_state.state['compare_mode'], seg_mode=seg_mode, lasso_op=lasso_op)
 
-else:
-    # LANDING PAGE
-    st.markdown("""
-    <div style='text-align: center; padding: 50px;'>
-        <h2>Welcome to AI Paint Visualizer Pro</h2>
-        <p>Upload a room photo from the sidebar to start designing.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    # 2. SIDEBAR CONTROLS (Define Inputs First)
+    else:
+        # LANDING PAGE
+        st.markdown(f"""
+        <div style='text-align: center; padding: 50px;'>
+            <h2>Welcome to AI Paint Visualizer Pro</h2>
+            <p>Upload a room photo from the sidebar to start designing.</p>
+            <p style='color: gray; font-size: 0.8rem;'>Detected Mode: {'Mobile' if is_mobile else 'Desktop'}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+except Exception as global_err:
+    st.error(f"🚨 Critical App Crash: {global_err}")
+    st.info("This is often due to server memory limits. Try using a smaller file or refreshing.")
+    import traceback
+    st.code(traceback.format_exc())
 
 # --- Painted Objects Manager (Sidebar) ---
 st.sidebar.markdown("---")
