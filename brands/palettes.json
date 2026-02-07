@@ -1,0 +1,108 @@
+{
+  "brands": [
+    {
+      "name": "DreamCo Paints",
+      "collections": [
+        {
+          "name": "Modern Minimalist",
+          "colors": [
+            {
+              "name": "Whisper White",
+              "hex": "#F5F5F0",
+              "id": "mm01",
+              "lab": [
+                96,
+                -2,
+                2
+              ],
+              "reflectance": 0.85,
+              "finish_available": [
+                "matte",
+                "silk"
+              ]
+            },
+            {
+              "name": "Urban Grey",
+              "hex": "#A9A9A9",
+              "id": "mm02",
+              "lab": [
+                68,
+                0,
+                0
+              ],
+              "reflectance": 0.45,
+              "finish_available": [
+                "matte"
+              ]
+            },
+            {
+              "name": "Charcoal Mist",
+              "hex": "#36454F",
+              "id": "mm03",
+              "lab": [
+                28,
+                -2,
+                -5
+              ],
+              "reflectance": 0.15,
+              "finish_available": [
+                "matte",
+                "silk"
+              ]
+            },
+            {
+              "name": "Soft Beige",
+              "hex": "#F5F5DC",
+              "id": "mm04",
+              "lab": [
+                94,
+                -3,
+                12
+              ],
+              "reflectance": 0.80,
+              "finish_available": [
+                "matte"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Sensorial",
+          "colors": [
+            {
+              "name": "Sunset Clay",
+              "hex": "#C06C59",
+              "id": "ne04",
+              "lab": [
+                58,
+                35,
+                25
+              ],
+              "reflectance": 0.30,
+              "finish_available": [
+                "matte",
+                "silk",
+                "gloss"
+              ]
+            },
+            {
+              "name": "Deep Ocean",
+              "hex": "#003366",
+              "id": "ne05",
+              "lab": [
+                22,
+                10,
+                -45
+              ],
+              "reflectance": 0.10,
+              "finish_available": [
+                "silk",
+                "gloss"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
