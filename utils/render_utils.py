@@ -13,7 +13,7 @@ def render_high_res(original_image, masks, wall_assignments):
         masks: List of masks at lower resolution.
         wall_assignments: Dict mapping mask index to color/finish data.
     """
-    # 1. Prepare Full Res Image and Lighting
+    # 1. Prepare Full Res Image and Lightingss
     full_res_cv2 = np.array(original_image.convert("RGB"))
     h_full, w_full = full_res_cv2.shape[:2]
     
