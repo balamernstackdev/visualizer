@@ -681,16 +681,15 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
 
 
 
-# 2. SIDEBAR CONTROLS (Define Inputs BEFORE Usage)
-# Moving this up so tool_mode is available for render_dashboard
-with st.sidebar:
-    st.markdown("---")
+@st.fragment
+def sidebar_controller_fragment():
+    # --- Unified Sidebar Manager ---
     st.markdown("### 🛠 Selection Tool")
     tool_mode = st.radio("Method", [
         "🎯 AI Click Object (Point)", 
         "✨ AI Object (Drag Box)", 
         "🪄 Manual Lasso (Polygon)"
-    ], label_visibility="visible")
+    ], label_visibility="visible", key="sidebar_tool_mode")
 
     # UNIQUE CONTROLS PER MODE
     seg_mode = "Walls (Default)"
@@ -702,26 +701,74 @@ with st.sidebar:
                 "Walls (Default)", 
                 "Small Objects", 
                 "Floors/Whole"
-            ], index=["Walls (Default)", "Small Objects", "Floors/Whole"].index(st.session_state.state.get('segmentation_mode', 'Walls (Default)')))
+            ], index=["Walls (Default)", "Small Objects", "Floors/Whole"].index(st.session_state.state.get('segmentation_mode', 'Walls (Default)')),
+            key="sidebar_seg_mode")
             st.session_state.state['segmentation_mode'] = seg_mode
     
-    # Common Add/Remove for Lasso and Drag Box (Consolidated Logic)
     if "Lasso" in tool_mode or "Drag Box" in tool_mode:
         with st.expander("🎨 Operation", expanded=True):
-            lasso_op = st.radio("Operation", ["Add", "Remove"], horizontal=True, key="lasso_op_radio")
+            lasso_op = st.radio("Operation", ["Add", "Remove"], horizontal=True, key="sidebar_lasso_op")
 
     st.markdown("### 👁 View Settings")
-    compare_mode = st.toggle("Compare Before/After", value=st.session_state.state.get('compare_mode', False))
+    compare_mode = st.toggle("Compare Before/After", value=st.session_state.state.get('compare_mode', False), key="sidebar_compare_toggle")
     st.session_state.state['compare_mode'] = compare_mode
 
     st.markdown("---")
     col_u1, col_u2 = st.columns(2)
     with col_u1:
-        if st.button("Undo", key="undo_btn"):
+        if st.button("Undo", key="sidebar_undo"):
             undo(); st.rerun()
     with col_u2:
-        if st.button("Reset", key="reset_btn"):
+        if st.button("Reset", key="sidebar_reset"):
             reset_paint(); st.rerun()
+
+    # --- Painted Objects Manager ---
+    st.markdown("---")
+    st.markdown("## 🏘 Painted Objects")
+    if not st.session_state.state['wall_assignments']:
+        st.caption("No objects painted yet. Click a wall to begin.")
+    else:
+        sorted_msg_keys = sorted(list(st.session_state.state['wall_assignments'].keys()))
+        for m_idx in sorted_msg_keys:
+            data = st.session_state.state['wall_assignments'][m_idx]
+            is_expanded = (m_idx == st.session_state.state.get('selected_object_index', -1))
+            with st.expander(f"Object #{m_idx}", expanded=is_expanded):
+                if is_expanded: st.caption("✅ Currently Selected")
+                new_h = st.color_picker(f"Color #{m_idx}", data['hex'], key=f"sidebar_h_{m_idx}")
+                new_f = st.selectbox(f"Finish #{m_idx}", ["Matte", "Silk", "Gloss"], 
+                                        index=["matte", "silk", "gloss"].index(data['finish'].lower()), 
+                                        key=f"sidebar_f_{m_idx}")
+                
+                if new_h != data['hex'] or new_f.lower() != data['finish'].lower():
+                    st.session_state.state['wall_assignments'][m_idx].update({
+                        'hex': new_h, 'lab': hex_to_lab(new_h), 'finish': new_f
+                    })
+                    st.session_state.state['selected_object_index'] = m_idx
+                    st.rerun() 
+                
+                if st.button(f"Remove Object #{m_idx}", key=f"sidebar_rem_{m_idx}"):
+                    save_history()
+                    del st.session_state.state['wall_assignments'][m_idx]
+                    if st.session_state.state.get('selected_object_index') == m_idx:
+                        st.session_state.state['selected_object_index'] = -1
+                    st.rerun()
+
+    # --- Debug Sidebar ---
+    st.divider()
+    with st.expander("Debug Info", expanded=False):
+        debug_js_width = st.session_state.get('screen_width', 0)
+        is_mobile_debug = (debug_js_width > 0 and debug_js_width < 1100)
+        st.write(f"Device: {'Tablet/Mobile' if is_mobile_debug else 'Desktop'}")
+        st.write(f"Screen: {debug_js_width}px")
+        st.write(f"AI: {'Ready' if st.session_state.state.get('ai_ready') else 'Wait'}")
+        if st.button("🔄 Reset Global State", key="debug_reset_global"):
+            st.session_state.clear(); st.rerun()
+
+    return tool_mode, compare_mode, seg_mode, lasso_op
+
+with st.sidebar:
+    st.markdown("---")
+    tool_mode, compare_mode, seg_mode, lasso_op = sidebar_controller_fragment()
 
 try:
     if uploaded_file:
@@ -784,63 +831,3 @@ except Exception as global_err:
         st.rerun()
 
 
-# --- Painted Objects Manager (Sidebar) ---
-st.sidebar.markdown("---")
-st.sidebar.markdown("## 🏘 Painted Objects")
-if not st.session_state.state['wall_assignments']:
-    st.sidebar.caption("No objects painted yet. Click a wall to begin.")
-else:
-    # Sort assignments to render in order of creation (or reverse? Doesn't matter for list)
-    # We want latest on bottom usually, or top. 
-    # Let's iterate sorted keys.
-    sorted_msg_keys = sorted(list(st.session_state.state['wall_assignments'].keys()))
-    
-    for m_idx in sorted_msg_keys:
-        data = st.session_state.state['wall_assignments'][m_idx]
-        
-        # Auto-Expand only active one
-        is_expanded = (m_idx == st.session_state.state.get('selected_object_index', -1))
-        
-        with st.sidebar.expander(f"Object #{m_idx}", expanded=is_expanded):
-            # If expanded, we assume user interacted with it recently
-            if is_expanded:
-                 st.sidebar.caption("✅ Currently Selected")
-
-            new_h = st.sidebar.color_picker(f"Color #{m_idx}", data['hex'], key=f"obj_h_{m_idx}")
-            new_f = st.sidebar.selectbox(f"Finish #{m_idx}", ["Matte", "Silk", "Gloss"], 
-                                    index=["matte", "silk", "gloss"].index(data['finish'].lower()), 
-                                    key=f"obj_f_{m_idx}")
-            
-            if new_h != data['hex'] or new_f.lower() != data['finish'].lower():
-                st.session_state.state['wall_assignments'][m_idx].update({
-                    'hex': new_h, 'lab': hex_to_lab(new_h), 'finish': new_f
-                })
-                # Set this as active if changed
-                st.session_state.state['selected_object_index'] = m_idx
-                st.rerun() 
-            
-            if st.sidebar.button(f"Remove Object #{m_idx}", key=f"rem_{m_idx}"):
-                save_history()
-                del st.session_state.state['wall_assignments'][m_idx]
-                if st.session_state.state.get('selected_object_index') == m_idx:
-                    st.session_state.state['selected_object_index'] = -1
-                st.rerun()
-
-
-
-# --- Debug Sidebar ---
-st.sidebar.divider()
-with st.sidebar.expander("Debug Info", expanded=False):
-    debug_js_width = st.session_state.get('screen_width', 0)
-    is_mobile_debug = (debug_js_width == 0 or (debug_js_width > 0 and debug_js_width < 1100))
-    st.write(f"Device: {'Tablet/Mobile' if is_mobile_debug else 'Desktop'}")
-    st.write(f"Screen: {debug_js_width}px")
-    st.write(f"Last Tap: {st.session_state.get('last_click_coords', 'None')}")
-    st.write(f"Pointer Engine: Active")
-    if st.button("🧪 Simulate Middle Click"):
-        # Force a click at center for testing SAM
-        st.session_state.last_click_coords = {"x": 800, "y": 800}
-        st.rerun()
-    if st.button("🔄 Reset Interaction State"):
-        st.session_state.last_click_coords = None
-        st.rerun()
