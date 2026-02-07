@@ -199,6 +199,10 @@ uploaded_file = st.sidebar.file_uploader("Upload Room Image", type=["jpg", "png"
 
 @st.fragment
 def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", lasso_op="Add"):
+    # --- ROBUST DEVICE DETECTION ---
+    js_width = st.session_state.get('screen_width', 0)
+    is_mobile = (js_width == 0 or (js_width > 0 and js_width < 1100))
+    
     # --- UNIFIED CONTROL HEADER ---
     h_col1, h_col2, h_spacer = st.columns([5, 1, 2], vertical_alignment="center")
     
@@ -334,12 +338,15 @@ def render_dashboard(tool_mode, compare_mode=False, seg_mode="Walls (Default)", 
     selected_reflectance = 0.5
     
     # --- LAZY AI AND LIGHTING INITIALIZATION ---
-    # Only run these if we have an image but haven't analyzed it yet
     if 'base_image' in st.session_state:
         if st.session_state.state.get('lighting_maps') is None:
-            with st.spinner("🌤 Analyzing lighting..."):
-                from utils.lighting_utils import extract_lighting_maps
-                st.session_state.state['lighting_maps'] = extract_lighting_maps(st.session_state.base_image)
+            try:
+                with st.spinner("🌤 Analyzing lighting..."):
+                    from utils.lighting_utils import extract_lighting_maps
+                    st.session_state.state['lighting_maps'] = extract_lighting_maps(st.session_state.base_image)
+            except Exception as e:
+                st.error(f"Memory limit hit during analysis. Please use a smaller image.")
+                return
         
         # Only initialize SAM if it's the first time and we are in an AI tool mode
         if "AI" in tool_mode and not st.session_state.state.get('ai_ready'):
