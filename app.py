@@ -1,14 +1,6 @@
-# AI Paint Visualizer Pro - Version 1.0.1
 import streamlit as st
-import numpy as np
-import cv2
-import json
 from PIL import Image
-
-
-
-
-from utils.image_utils import resize_image_max_side, load_image_from_bytes, pil_to_cv2, cv2_to_pil
+from utils.image_utils import resize_image_max_side, pil_to_cv2, cv2_to_pil
 from utils.export_utils import convert_to_downloadable, create_comparison_image
 from utils.lighting_utils import extract_lighting_maps
 from utils.mask_utils import merge_masks, smooth_mask, dilate_mask
@@ -16,6 +8,9 @@ from ui.lasso_canvas import render_lasso_tool, render_click_tool, render_box_too
 from paint_ai.paint_engine import apply_realistic_paint
 from utils.render_utils import render_high_res
 from streamlit_javascript import st_javascript
+
+# Lazy imports for heavy libraries
+# numpy and cv2 will be imported inside functions as needed
 
 # Page Config
 st.set_page_config(
@@ -119,6 +114,8 @@ st.markdown("""
 
 # Helper: Convert Hex to LAB for Paint Engine
 def hex_to_lab(hex_code):
+    import numpy as np
+    import cv2
     hex_code = hex_code.lstrip('#')
     rgb = tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))
     rgb_arr = np.array([[list(rgb)]], dtype=np.uint8) 

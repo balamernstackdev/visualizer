@@ -1,5 +1,3 @@
-import torch
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
 import os
 import requests
 import streamlit as st
@@ -46,6 +44,8 @@ def download_model_if_needed():
 @st.cache_resource
 def load_sam_model():
     """Loads the SAM model and returns it. Cached by Streamlit."""
+    import torch
+    from segment_anything import sam_model_registry
     if not os.path.exists(SAM_CHECKPOINT_PATH):
         # We don't want to auto-download inside a cached function if it's large
         return None
@@ -65,6 +65,7 @@ def load_sam_model():
 
 def get_mask_generator(sam):
     """Returns an automatic mask generator optimized for walls."""
+    from segment_anything import SamAutomaticMaskGenerator
     return SamAutomaticMaskGenerator(
         model=sam,
         points_per_side=24, # 24 = Standard Density (Maximum Speed)
@@ -76,6 +77,7 @@ def get_mask_generator(sam):
 
 def get_predictor(sam):
     """Returns a predictor for prompt-based segmentation."""
+    from segment_anything import SamPredictor
     return SamPredictor(sam)
 
 def get_sam_predictor():
