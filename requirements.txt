@@ -1,0 +1,11 @@
+streamlit
+opencv-python-headless
+segment-anything
+torch
+torchvision
+numpy
+Pillow
+scipy
+streamlit-javascript
+streamlit-drawable-canvas
+# streamlit-image-coordinates  # Not currently used in app.py

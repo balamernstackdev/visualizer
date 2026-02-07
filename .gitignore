@@ -160,7 +160,6 @@ cython_debug/
 *.weights
 
 # Local logs
-*.txt
 *.log
 
 # OS generated files
